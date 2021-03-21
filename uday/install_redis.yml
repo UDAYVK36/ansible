@@ -1,0 +1,79 @@
+---
+- name: Install redis | Linux
+  hosts: all
+  gather_facts: true
+  become: true
+  become_user: root
+  tasks:
+    # - name: update OS patches
+    #   yum:
+    #     name: "*"
+    #     state: latest
+    #     update_cache: true
+
+    - name: Enable extra repo
+      yum:
+        name: [epel-release, yum-utils]
+        state: present
+        update_cache: true
+
+    - name: Install remi Repo
+      yum:
+        name: http://rpms.remirepo.net/enterprise/remi-release-7.rpm
+        state: present
+
+    - name: Install redis
+      yum:
+        name: redis
+        enablerepo: remi
+      notify: redis_start
+
+    - name: "update server private ip address to redis bind  | /etc/redis.conf"
+      lineinfile:
+        path: /etc/redis.conf
+        regex: "^bind"
+        line: "bind  127.0.0.1 {{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+      notify: redis_restart
+
+    - name: geneate password hash | sha256sum
+      shell: echo "redis" | sha256sum
+      register: sha256pass
+      changed_when: false
+
+
+    - name: Configure redis authentication for clients
+      lineinfile:
+        path: /etc/redis.conf
+        regex: "^# requirepass"
+        line: "requirepass {{ sha256pass.stdout.split(' ')[0] }}"
+      notify: redis_restart
+
+    - name: Set persitant Store for recovery
+      lineinfile:
+        path: /etc/redis.conf
+        regex: "^appendonly"
+        line: "appendonly yes"
+      notify: redis_restart
+
+    - name: Install firewalld to manage firewall
+      yum:
+        name: firewalld
+        state: present
+
+    - name: enable firewall traffic for redis
+      ansible.posix.firewalld:
+        port: 6379/tcp
+        permanent: yes
+        state: enabled
+
+
+  handlers:
+      - name: redis_start
+        systemd:
+          name: redis
+          state: started
+
+      - name: redis_restart
+        systemd:
+          name: redis
+          state: restarted

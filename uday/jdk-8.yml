@@ -1,0 +1,27 @@
+---
+- name: install jd8-8 on linux machie
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Download jdk-8 from Oracle
+      get_url:
+        url: https://download.oracle.com/otn-pub/java/jdk/8u281-b09/89d678f2be164786b292527658ca1605/jdk-8u281-linux-x64.rpm
+        headers:
+          Cookie: 'oraclelicense=accept-securebackup-cookie'
+        dest: /tmp/jdk-8u281-linux-x64.rpm
+        checksum: sha256:475199133913367986c438ecc91e9dfe9ca689a7750250261cb772f227dee3a2
+        force: true
+        validate_certs: false
+      delegate_to: localhost
+
+    - name: Copy jdk-8 rpm to remote host
+      copy:
+        src: /tmp/jdk-8u281-linux-x64.rpm
+        dest: /tmp/jdk-8u281-linux-x64.rpm
+
+    - name: install jdk-8 rpm on remote host
+      yum:
+        name: /tmp/jdk-8u281-linux-x64.rpm
+        state: present
+      become: true
+      become_user: root
